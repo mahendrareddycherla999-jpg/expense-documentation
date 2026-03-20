@@ -1,124 +1,65 @@
-### Backend
-Backend service is responsible for adding the given values to database. Backend service is written in NodeJS, Hence we need to install NodeJS.
+# Frontend
 
-**Developer has chosen NodeJs, Check with developer which version of NodeJS is needed. Developer has set a context that it can work with NodeJS >20**
+The frontend is the service in Expense to serve the web content over Nginx. This will have the web frame for the web application.
 
-Install NodeJS, By default NodeJS 16 is available, We would like to enable 20 version and install this.
+This is a static content and to serve static content we need a web server. This server
 
-**You can list modules by using dnf module list**
+Developer has chosen Nginx as a web server and thus we will install Nginx Web Server.
 
+Install Nginx
 ```
-dnf module disable nodejs -y
+dnf install nginx -y 
 ```
+Enable nginx
 ```
-dnf module enable nodejs:20 -y
+systemctl enable nginx
 ```
-
+Start nginx
 ```
-dnf install nodejs -y
-```
-
-Update openssl packages too not break SSH login
-```
-dnf update -y openssh openssh-server openssh-clients
+systemctl start nginx
 ```
 
-Configure the application.
+**Try to access the service once over the browser and ensure you get some default content**
 
-Add application User
+Remove the default content that web server is serving.
 ```
-useradd expense
-```
-
-User expense is a function / daemon user to run the application. Apart from that we don't use this user to login to server.
-
-Also, username expense has been picked because it more suits to our project name.
-
-We keep application in one standard location. This is a usual practice that runs in the organization.
-
-Lets setup an app directory.
-
-```
-mkdir /app
+rm -rf /usr/share/nginx/html/*
 ```
 
-Download the application code to created app directory.
-
+Download the frontend content
 ```
-curl -o /tmp/backend.zip https://expense-joindevops.s3.us-east-1.amazonaws.com/expense-backend-v2.zip
+curl -o /tmp/frontend.zip https://expense-joindevops.s3.us-east-1.amazonaws.com/expense-frontend-v2.zip
 ```
+Extract the frontend content.
 ```
-cd /app
-```
-```
-unzip /tmp/backend.zip
-```
-
-Every application is developed by development team will have some common softwares that they use as libraries. This application also have the same way of defined dependencies in the application configuration.
-
-Lets download the dependencies.
-
-```
-cd /app
+cd /usr/share/nginx/html
 ```
 ```
-npm install
+unzip /tmp/frontend.zip
 ```
 
-We need to setup a new service in systemd so systemctl can manage this service
+**Try to access the nginx service once more over the browser and ensure you get expense content.**
 
-Setup SystemD Expense Backend Service
+Create Nginx Reverse Proxy Configuration.
 ```
-vim /etc/systemd/system/backend.service
+vim /etc/nginx/default.d/expense.conf
 ```
-
+Add the following content
 ```
-[Unit]
-Description = Backend Service
+proxy_http_version 1.1;
 
-[Service]
-User=expense
-Environment=DB_HOST="<MYSQL-SERVER-IPADDRESS>"
-ExecStart=/bin/node /app/index.js
-SyslogIdentifier=backend
+location /api/ { proxy_pass http://localhost:8080/; }
 
-[Install]
-WantedBy=multi-user.target
+location /health {
+  stub_status on;
+  access_log off;
+}
 ```
 
-**NOTE: Ensure you replace <MYSQL-SERVER-IPADDRESS> with IP address**
+**Ensure you replace the localhost with the actual ip address of backend component server. Word localhost is just used to avoid the failures on the Nginx Server.**
 
-Load the service.
-
-```
-systemctl daemon-reload
-```
-
-Start the service.
-```
-systemctl start backend
-```
-```
-systemctl enable backend
-```
-
-For this application to work fully functional we need to load schema to the Database.
-
-We need to load the schema. To load schema we need to install mysql client.
-
-To have it installed we can use
+Restart Nginx Service to load the changes of the configuration.
 
 ```
-dnf install mysql -y
-```
-
-Load Schema
-
-```
-mysql -h <MYSQL-SERVER-IPADDRESS> -uroot -pExpenseApp@1 < /app/schema/backend.sql
-```
-
-Restart the service.
-```
-systemctl restart backend
+systemctl restart nginx
 ```
