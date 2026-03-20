@@ -1,48 +1,78 @@
-Frontend 
-The frontend is the service in Expense to serve the web content over Nginx. This will have the web frame for the web application.
+Backend
+Backend service is responsible for adding the given values to database. Backend service is written in NodeJS, Hence we need to install NodeJS.
 
-This is a static content and to serve static content we need a web server. This server
+Developer has chosen NodeJs, Check with developer which version of NodeJS is needed. Developer has set a context that it can work with NodeJS >20
 
-Developer has chosen Nginx as a web server and thus we will install Nginx Web Server.
+Install NodeJS, By default NodeJS 16 is available, We would like to enable 20 version and install this.
 
-Install Nginx
+You can list modules by using dnf module list
 
-dnf install nginx -y 
-Enable nginx
+dnf module disable nodejs -y
+dnf module enable nodejs:20 -y
+dnf install nodejs -y
+Update openssl packages too not break SSH login
 
-systemctl enable nginx
-Start nginx
+dnf update -y openssh openssh-server openssh-clients
+Configure the application.
 
-systemctl start nginx
-Try to access the service once over the browser and ensure you get some default content
+Add application User
 
-Remove the default content that web server is serving.
+useradd expense
+User expense is a function / daemon user to run the application. Apart from that we don't use this user to login to server.
 
-rm -rf /usr/share/nginx/html/*
-Download the frontend content
+Also, username expense has been picked because it more suits to our project name.
 
-curl -o /tmp/frontend.zip https://expense-joindevops.s3.us-east-1.amazonaws.com/expense-frontend-v2.zip
-Extract the frontend content.
+We keep application in one standard location. This is a usual practice that runs in the organization.
 
-cd /usr/share/nginx/html
-unzip /tmp/frontend.zip
-Try to access the nginx service once more over the browser and ensure you get expense content.
+Lets setup an app directory.
 
-Create Nginx Reverse Proxy Configuration.
+mkdir /app
+Download the application code to created app directory.
 
-vim /etc/nginx/default.d/expense.conf
-Add the following content
+curl -o /tmp/backend.zip https://expense-joindevops.s3.us-east-1.amazonaws.com/expense-backend-v2.zip
+cd /app
+unzip /tmp/backend.zip
+Every application is developed by development team will have some common softwares that they use as libraries. This application also have the same way of defined dependencies in the application configuration.
 
-proxy_http_version 1.1;
+Lets download the dependencies.
 
-location /api/ { proxy_pass http://localhost:8080/; }
+cd /app
+npm install
+We need to setup a new service in systemd so systemctl can manage this service
 
-location /health {
-  stub_status on;
-  access_log off;
-}
-Ensure you replace the localhost with the actual ip address of backend component server. Word localhost is just used to avoid the failures on the Nginx Server.
+Setup SystemD Expense Backend Service
 
-Restart Nginx Service to load the changes of the configuration.
+vim /etc/systemd/system/backend.service
+[Unit]
+Description = Backend Service
 
-systemctl restart nginx
+[Service]
+User=expense
+Environment=DB_HOST="<MYSQL-SERVER-IPADDRESS>"
+ExecStart=/bin/node /app/index.js
+SyslogIdentifier=backend
+
+[Install]
+WantedBy=multi-user.target
+NOTE: Ensure you replace with IP address
+
+Load the service.
+
+systemctl daemon-reload
+Start the service.
+
+systemctl start backend
+systemctl enable backend
+For this application to work fully functional we need to load schema to the Database.
+
+We need to load the schema. To load schema we need to install mysql client.
+
+To have it installed we can use
+
+dnf install mysql -y
+Load Schema
+
+mysql -h <MYSQL-SERVER-IPADDRESS> -uroot -pExpenseApp@1 < /app/schema/backend.sql
+Restart the service.
+
+systemctl restart backend
